@@ -1,36 +1,43 @@
-import { Hono } from 'hono'
-import { z } from 'zod'
+import { Hono } from "hono";
+import { z } from "zod";
+import { cors } from "hono/cors";
 
-const app = new Hono()
+const app = new Hono();
 
-const userSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8),
-  name: z.string().optional(),
-  age: z.number().int().positive().optional(),
-}).partial() // Make all fields optional for GET
+// ... (CORS and logger middleware remain the same)
 
-app.get('/users', async (c) => {
-  try {
-    const queryParams = c.req.query() // Get query parameters
+const authMiddleware = async (c, next) => {
+    const authHeader = c.req.header("Authorization");
 
-    // Validate query parameters
-    const validatedQuery = userSchema.parse(queryParams)
-
-    console.log(validatedQuery)
-    return c.json({ message: 'User data retrieved', user: validatedQuery }, 200)
-
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      const errors = error.errors.map((err) => ({
-        path: err.path.join('.'),
-        message: err.message,
-      }));
-      return c.json({ errors }, 400)
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        return c.json({ error: "Unauthorized" }, 401);
     }
 
-    return c.json({ error: 'An unexpected error occurred' }, 500)
-  }
-})
+    const token = authHeader.substring(7);
 
-export default app
+    const isValidToken = token === c.env.AUTH_TOKEN; // Use c.env here
+
+    if (!isValidToken) {
+        return c.json({ error: "Unauthorized" }, 401);
+    }
+
+    await next();
+};
+
+app.use("/users/:id", authMiddleware);
+
+// ... (userSchema and /users route remain the same)
+
+app.get("/env", (c) => {
+    const myValue = c.env.MY_ENV_VARIABLE; // Use c.env here
+
+    if (myValue === undefined) { // Check for undefined, not falsy
+        return c.json({ message: "Environment variable not set" }, 404);
+    }
+
+    return c.json({ value: myValue }, 200);
+});
+
+// ... (rest of the code remains the same)
+
+export default app;
