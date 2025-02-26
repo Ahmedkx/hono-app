@@ -6,22 +6,22 @@ const app = new Hono()
 const userSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
-  name: z.string().optional(), // Example of an optional field
-  age: z.number().int().positive().optional() // Optional positive integer
-})
+  name: z.string().optional(),
+  age: z.number().int().positive().optional(),
+}).partial() // Make all fields optional for GET
 
-app.post('/users', async (c) => {
+app.get('/users', async (c) => {
   try {
-    const body = await c.req.json()
-    const validatedBody = userSchema.parse(body) // Throws an error if validation fails
+    const queryParams = c.req.query() // Get query parameters
 
-    // validatedBody now contains the validated data
-    console.log(validatedBody)
-    return c.json({ message: 'User created', user: validatedBody }, 201)
+    // Validate query parameters
+    const validatedQuery = userSchema.parse(queryParams)
+
+    console.log(validatedQuery)
+    return c.json({ message: 'User data retrieved', user: validatedQuery }, 200)
 
   } catch (error) {
     if (error instanceof z.ZodError) {
-      // Handle Zod validation errors
       const errors = error.errors.map((err) => ({
         path: err.path.join('.'),
         message: err.message,
